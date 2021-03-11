@@ -31,7 +31,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
 
 DEFAULT_NAMESPACE=devworkspace-che
 DEFAULT_IMG=quay.io/che-incubator/devworkspace-che-operator:latest
-DEFAUlT_PULL_POLICY=Always
+DEFAULT_PULL_POLICY=Always
 DEFAULT_OUTPUT_DIR="${SCRIPT_DIR%/}/deployment"
 
 function print_help() {
@@ -50,9 +50,9 @@ function print_help() {
   echo ""
   echo "These are the values of the environment variables used with --use-defaults:"
   echo ""
-  echo "NAMESPACE=${DEFAULT_NAMESPACE}"
-  echo "IMG=${DEFAULT_IMG}"
-  echo "PULL_POLICY=${DEFAULT_PULL_POLICY}"
+  echo "DWCO_NAMESPACE=${DEFAULT_NAMESPACE}"
+  echo "DWCO_IMG=${DEFAULT_IMG}"
+  echo "DWCO_PULL_POLICY=${DEFAULT_PULL_POLICY}"
   echo "OUTPUT_DIR=${DEFAULT_OUTPUT_DIR}"
 }
 
@@ -85,14 +85,14 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if $USE_DEFAULT_ENV; then
-    export NAMESPACE="${DEFAULT_NAMESPACE}"
-    export IMG="${DEFAULT_IMG}"
-    export PULL_POLICY="${DEFAULT_PULL_POLICY}"
+    export DWCO_NAMESPACE="${DEFAULT_NAMESPACE}"
+    export DWCO_IMG="${DEFAULT_IMG}"
+    export DWCO_PULL_POLICY="${DEFAULT_PULL_POLICY}"
     export OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 else
-    export NAMESPACE="${NAMESPACE:-$DEFAULT_NAMESPACE}"
-    export IMG=${IMG:-$DEFAULT_IMG}
-    export PULL_POLICY=${PULL_POLICY:-$DEFAULT_PULL_POLICY}
+    export DWCO_NAMESPACE="${DWCO_NAMESPACE:-$DEFAULT_NAMESPACE}"
+    export DWCO_IMG=${DWCO_IMG:-$DEFAULT_IMG}
+    export DWCO_PULL_POLICY=${DWCO_PULL_POLICY:-$DEFAULT_PULL_POLICY}
     export OUTPUT_DIR=${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}
 fi
 
@@ -124,8 +124,9 @@ KUSTOMIZE_VERSION=$(kustomize version | cut -d: -f2 | cut -d' ' -f1 | awk -F '/v
 EXPECTED_KUSTOMIZE_VERSION="4.0.1"
 if [[ $KUSTOMIZE_VERSION != $EXPECTED_KUSTOMIZE_VERSION ]]; then
     echo "WARNING: The last known version of kustomize in Github actions is $EXPECTED_KUSTOMIZE_VERSION but we're using $KUSTOMIZE_VERSION."
-    echo "WARNING: Kustomize changes formatting from time to time, which may result in errors the Github action that we're using to check that the deployment files have been generated."
-    echo "WARNING: If you see this message on Github action, that version changed and you need to upgrade this script (deploy/generate-deployment.sh)."
+    echo "WARNING: Kustomize changes formatting from time to time, which may result in errors in the Github action that we're using to check that the deployment files"
+    echo "WARNING: have been properly generated."
+    echo "WARNING: If you see this message on Github action, that version has changed and you need to upgrade this script (deploy/generate-deployment.sh)."
     echo "WARNING: If you see this locally, make sure to install kustomize $EXPECTED_KUSTOMIZE_VERSION:"
     echo "WARNING: curl -s \"https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh\" | bash -s $EXPECTED_KUSTOMIZE_VERSION"
     echo "WARNING:"

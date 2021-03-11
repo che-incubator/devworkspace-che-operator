@@ -9,5 +9,5 @@ spec:
     spec:
       containers:
       - name: devworkspace-che-operator
-        image: ${IMG}
-        imagePullPolicy: ${PULL_POLICY}
+        image: ${DWCO_IMG}
+        imagePullPolicy: ${DWCO_PULL_POLICY}

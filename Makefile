@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/che-incubator/devworkspace-che-operator:latest
+DWCO_IMG ?= quay.io/che-incubator/devworkspace-che-operator:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -78,11 +78,11 @@ generate: controller-gen
 
 ### docker-build: Build the docker image
 docker-build: test
-	docker build . -t ${IMG} -f build/dockerfiles/Dockerfile
+	docker build . -t ${DWCO_IMG} -f build/dockerfiles/Dockerfile
 
 ### docker-push: Push the docker image
 docker-push:
-	docker push ${IMG}
+	docker push ${DWCO_IMG}
 
 ### controller-gen: find or download controller-gen
 # download controller-gen if necessary
@@ -108,5 +108,6 @@ help: Makefile
 	@sed -n 's/^### /    /p' $< | awk 'BEGIN { FS=":" } { printf "%-30s -%s\n", $$1, $$2 }'
 	@echo ''
 	@echo 'Supported environment variables:'
-	@echo '    IMG                        - Image used for controller'
-	@echo '    NAMESPACE                  - Namespace to use for deploying controller'
+	@echo '    DWCO_IMG                    - Image used for controller'
+	@echo '    DWCO_NAMESPACE              - Namespace to use for deploying controller'
+	@choe '    DWCO_PULL_POLICY            - Pull policy of the operator image in the operator deployment'
