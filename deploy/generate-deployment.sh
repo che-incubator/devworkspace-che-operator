@@ -29,10 +29,11 @@ set -e
 
 SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
 
-DEFAULT_NAMESPACE=devworkspace-che
-DEFAULT_IMG=quay.io/che-incubator/devworkspace-che-operator:latest
-DEFAULT_PULL_POLICY=Always
+EXPECTED_KUSTOMIZE_VERSION="4.0.5"
+
+source "${SCRIPT_DIR%/}/defaults.sh"
 DEFAULT_OUTPUT_DIR="${SCRIPT_DIR%/}/deployment"
+DEFAULT_DWCO_GENERATED_OVERLAY=everything
 
 function print_help() {
   echo "Usage: generate-deployment.sh [ARGS]"
@@ -50,9 +51,10 @@ function print_help() {
   echo ""
   echo "These are the values of the environment variables used with --use-defaults:"
   echo ""
-  echo "DWCO_NAMESPACE=${DEFAULT_NAMESPACE}"
-  echo "DWCO_IMG=${DEFAULT_IMG}"
-  echo "DWCO_PULL_POLICY=${DEFAULT_PULL_POLICY}"
+  echo "DWCO_NAMESPACE=${DEFAULT_DWCO_NAMESPACE}"
+  echo "DWCO_IMG=${DEFAULT_DWCO_IMG}"
+  echo "DWCO_PULL_POLICY=${DEFAULT_DWCO_PULL_POLICY}"
+  echo "DWCO_GENERATED_OVERLAY=${DEFAULT_DWCO_GENERATED_OVERLAY}"
   echo "OUTPUT_DIR=${DEFAULT_OUTPUT_DIR}"
 }
 
@@ -85,16 +87,24 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if $USE_DEFAULT_ENV; then
-    export DWCO_NAMESPACE="${DEFAULT_NAMESPACE}"
-    export DWCO_IMG="${DEFAULT_IMG}"
-    export DWCO_PULL_POLICY="${DEFAULT_PULL_POLICY}"
+    export DWCO_NAMESPACE="${DEFAULT_DWCO_NAMESPACE}"
+    export DWCO_IMG="${DEFAULT_DWCO_IMG}"
+    export DWCO_PULL_POLICY="${DEFAULT_DWCO_PULL_POLICY}"
+    export DWCO_GENERATED_OVERLAY="${DEFAULT_DWCO_GENERATED_OVERLAY}"
     export OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 else
     export DWCO_NAMESPACE="${DWCO_NAMESPACE:-$DEFAULT_NAMESPACE}"
     export DWCO_IMG=${DWCO_IMG:-$DEFAULT_IMG}
     export DWCO_PULL_POLICY=${DWCO_PULL_POLICY:-$DEFAULT_PULL_POLICY}
+    export DWCO_GENERATED_OVERLAY="${DWCO_GENERATED_OVERLAY:-$DEFAULT_DWCO_GENERATED_OVERLAY}"
     export OUTPUT_DIR=${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}
 fi
+
+echo "Using DWCO_NAMESPACE=${DWCO_NAMESPACE}"
+echo "Using DWCO_IMG=${DWCO_IMG}"
+echo "Using DWCO_PULL_POLICY=${DWCO_PULL_POLICY}"
+echo "Using DWCO_GENERATED_OVERLAY=${DWCO_GENERATED_OVERLAY}"
+echo "Using OUTPUT_DIR=${OUTPUT_DIR}"
 
 #
 # main script
@@ -121,7 +131,6 @@ echo "Using yq $(yq --version | head -1 | cut -d' ' -f2)"
 
 # check that we're using compatible versions of the tools
 KUSTOMIZE_VERSION=$(kustomize version | cut -d: -f2 | cut -d' ' -f1 | awk -F '/v' '{print $2}')
-EXPECTED_KUSTOMIZE_VERSION="4.0.1"
 if [[ $KUSTOMIZE_VERSION != $EXPECTED_KUSTOMIZE_VERSION ]]; then
     echo "WARNING: The last known version of kustomize in Github actions is $EXPECTED_KUSTOMIZE_VERSION but we're using $KUSTOMIZE_VERSION."
     echo "WARNING: Kustomize changes formatting from time to time, which may result in errors in the Github action that we're using to check that the deployment files"
@@ -134,7 +143,7 @@ if [[ $KUSTOMIZE_VERSION != $EXPECTED_KUSTOMIZE_VERSION ]]; then
 fi
 
 #space separated list of templates to interpolate
-TEMPLATES="templates/base/kustomization.yaml templates/base/manager_image_patch.yaml"
+TEMPLATES="templates/overlays/support/kustomization.yaml templates/overlays/everything/kustomization.yaml templates/overlays/everything/manager_image_patch.yaml"
 
 for t in $TEMPLATES; do
     # save backups and do env substitution in the originals
@@ -144,13 +153,13 @@ done
 
 # run kustomize on the substituted templates
 echo "Generating config for Kubernetes"
-kustomize build "${SCRIPT_DIR}/templates/base" > "${KUBERNETES_DIR}/${COMBINED_FILENAME}"
+kustomize build "${SCRIPT_DIR}/templates/overlays/${DWCO_GENERATED_OVERLAY}" > "${KUBERNETES_DIR}/${COMBINED_FILENAME}"
 echo "File saved to ${KUBERNETES_DIR}/${COMBINED_FILENAME}"
 
 # for now, this is the same as for kubernetes. I assume they will start to diverge as soon as we start
 # playing with auth.
 echo "Generating config for OpenShift"
-kustomize build "${SCRIPT_DIR}/templates/base" > "${OPENSHIFT_DIR}/${COMBINED_FILENAME}"
+kustomize build "${SCRIPT_DIR}/templates/overlays/${DWCO_GENERATED_OVERLAY}" > "${OPENSHIFT_DIR}/${COMBINED_FILENAME}"
 echo "File saved to ${OPENSHIFT_DIR}/${COMBINED_FILENAME}"
 
 # Restore the backups

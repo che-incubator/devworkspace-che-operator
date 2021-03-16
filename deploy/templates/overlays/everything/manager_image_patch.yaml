@@ -9,5 +9,5 @@ spec:
     spec:
       containers:
       - name: devworkspace-che-operator
-        image: ${DWCO_IMG}
-        imagePullPolicy: ${DWCO_PULL_POLICY}
+        image: quay.io/che-incubator/devworkspace-che-operator:latest
+        imagePullPolicy: Always

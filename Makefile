@@ -1,6 +1,12 @@
+# Define the environment variables affecting the deployment generation
+include deploy/defaults.sh
+export DWCO_IMG ?= $(DEFAULT_DWCO_IMG)
+export DWCO_NAMESPACE ?= $(DEFAULT_DWCO_NAMESPACE)
+export DWCO_PULL_POLICY ?= $(DEFAULT_DWCO_PULL_POLICY)
 
-# Image URL to use all building/pushing image targets
-DWCO_IMG ?= quay.io/che-incubator/devworkspace-che-operator:latest
+# create the temporary directory under the same parent dir as the Makefile
+TEMP_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))/.tmp
+
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -27,38 +33,61 @@ else
 PLATFORM := kubernetes
 endif
 
-all: manager
+# our targets don't generate files in a way make assumes
+.PHONY: all clean test compile prepare run run_as_current_user debug deploy undeploy generate_deployment manifests fmt vet generate docker-build docker-push controller-gen help
+
+all: compile
+
+### clean: deletes the potential leftover generated files from the previous build runs
+clean:
+	@rm -Rf $(TEMP_DIR)
 
 ### test: Run tests
 test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out
+	go test -v -coverprofile cover.out ./...
 
-### manager: Build manager binary
-manager: generate fmt vet
+### compile: Build the manager binary
+compile: generate fmt vet
 	go build -o bin/manager main.go
 
-### run: Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+### prepare: Prepares the cluster for running the operator - deploys CRDs, rbac and the service account
+prepare: _mk_temp manifests
+	$(eval PREPAPRE_OUTPUT_DIR := $(shell mktemp -p $(TEMP_DIR) -d))
+	OUTPUT_DIR=$(PREPAPRE_OUTPUT_DIR) DWCO_GENERATED_OVERLAY=support deploy/generate-deployment.sh --split-yaml
+	$(K8S_CLI) create namespace $(DWCO_NAMESPACE) || true
+	$(K8S_CLI) apply -f $(PREPAPRE_OUTPUT_DIR)/$(PLATFORM)/combined.yaml
+	rm -Rf $(PREPAPRE_OUTPUT_DIR)
+
+### run: Run against the configured Kubernetes cluster in ~/.kube/config using the deployed service account
+run: generate fmt vet prepare
+	$(eval KUBECONFIG:=$(shell deploy/generate-restricted-kubeconfig.sh $(TEMP_DIR) devworkspace-che-serviceaccount $(DWCO_NAMESPACE)))
+	KUBECONFIG=$(KUBECONFIG) go run ./main.go || true
+	rm $(KUBECONFIG)
+
+### run_as_current_user: Run against the configured Kubernetes cluster in ~/.kube/config using the current context
+run_as_current_user: generate fmt vet prepare
 	go run ./main.go
 
-debug: generate fmt vet manifests
+debug: generate fmt vet prepare
 	dlv debug --listen=:2345 --headless=true --api-version=2 ./main.go --
 	
-### install: Install CRDs into a cluster
-install: manifests
-	kustomize build deploy/templates/crd | $(K8S_CLI) apply -f -
-
-### uninstall: Uninstall CRDs from a cluster
-uninstall: manifests
-	kustomize build deploy/templates/crd | $(K8S_CLI) delete -f -
-
 ### deploy: Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: generate_deployment
+	$(K8S_CLI) create namespace $(DWCO_NAMESPACE) || true
 	$(K8S_CLI) apply -f deploy/deployment/$(PLATFORM)/combined.yaml
+
+### undeploy: Removes everything related to Devworkspace Che from the cluster.
+undeploy: generate_deployment
+	$(K8S_CLI) delete devworkspaces.workspace.devfile.io --all-namespaces --all --wait || true
+	$(K8S_CLI) delete devworkspacetemplates.workspace.devfile.io --all-namespaces --all || true
+	$(K8S_CLI) delete workspaceroutings.controller.devfile.io --all-namespaces --all --wait || true
+	$(K8S_CLI) delete chemanagers.che.eclipse.org --all-namespaces --all --wait || true
+	$(K8S_CLI) delete all -l "app.kubernetes.io/part-of=devworkspace-che-operator" --all-namespaces --wait || true
+	$(K8S_CLI) delete -f deploy/deployment/$(PLATFORM)/combined.yaml --wait || true
 
 ### generate_deployment: generates the deployment files in deploy/deployment
 generate_deployment: manifests
-	deploy/generate-deployment.sh --split-yaml
+	@deploy/generate-deployment.sh --split-yaml
 
 ### manifests: Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
@@ -101,7 +130,6 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
-.PHONY: help
 ### help: print this message
 help: Makefile
 	@echo 'Available rules:'
@@ -110,4 +138,7 @@ help: Makefile
 	@echo 'Supported environment variables:'
 	@echo '    DWCO_IMG                    - Image used for controller'
 	@echo '    DWCO_NAMESPACE              - Namespace to use for deploying controller'
-	@choe '    DWCO_PULL_POLICY            - Pull policy of the operator image in the operator deployment'
+	@echo '    DWCO_PULL_POLICY            - Pull policy of the operator image in the operator deployment'
+
+_mk_temp:
+	@mkdir -p $(TEMP_DIR)

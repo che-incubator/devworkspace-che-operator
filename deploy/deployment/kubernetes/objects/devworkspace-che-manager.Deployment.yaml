@@ -42,6 +42,7 @@ spec:
         - name: RELATED_IMAGE_gateway_configurer
           value: quay.io/che-incubator/configbump:0.1.4
         image: quay.io/che-incubator/devworkspace-che-operator:latest
+        imagePullPolicy: Always
         name: devworkspace-che-operator
         resources:
           limits:
