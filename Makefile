@@ -71,13 +71,13 @@ run_as_current_user: generate fmt vet prepare
 debug: generate fmt vet prepare
 	dlv debug --listen=:2345 --headless=true --api-version=2 ./main.go --
 	
-### deploy: Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: generate_deployment
+### install: Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+install: generate_deployment
 	$(K8S_CLI) create namespace $(DWCO_NAMESPACE) || true
 	$(K8S_CLI) apply -f deploy/deployment/$(PLATFORM)/combined.yaml
 
-### undeploy: Removes everything related to Devworkspace Che from the cluster.
-undeploy: generate_deployment
+### uninstall: Removes everything related to Devworkspace Che from the cluster.
+uninstall: generate_deployment
 	$(K8S_CLI) delete devworkspaces.workspace.devfile.io --all-namespaces --all --wait || true
 	$(K8S_CLI) delete devworkspacetemplates.workspace.devfile.io --all-namespaces --all || true
 	$(K8S_CLI) delete workspaceroutings.controller.devfile.io --all-namespaces --all --wait || true
@@ -142,3 +142,4 @@ help: Makefile
 
 _mk_temp:
 	@mkdir -p $(TEMP_DIR)
+
