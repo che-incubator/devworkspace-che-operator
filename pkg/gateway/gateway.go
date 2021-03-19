@@ -17,8 +17,8 @@ import (
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
+	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
@@ -115,7 +115,7 @@ func (g *CheGateway) Sync(ctx context.Context, manager *v1alpha1.CheManager) (bo
 
 	var host string
 
-	if infrastructure.Current.Type == infrastructure.OpenShift {
+	if infrastructure.IsOpenShift() {
 		if partial, host, err = g.reconcileRoute(syncer, ctx, manager); err != nil {
 			return false, "", err
 		}

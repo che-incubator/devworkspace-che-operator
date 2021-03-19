@@ -10,11 +10,13 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/gateway"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
+	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +27,8 @@ import (
 )
 
 func createTestScheme() *runtime.Scheme {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(extensions.AddToScheme(scheme))
@@ -47,7 +51,7 @@ func TestCreatesObjectsInSingleHost(t *testing.T) {
 			Namespace: ns,
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host: "over.the.rainbow",
+			GatewayHost: "over.the.rainbow",
 		},
 	})
 
@@ -120,7 +124,7 @@ func TestUpdatesObjectsInSingleHost(t *testing.T) {
 				Finalizers: []string{FinalizerName},
 			},
 			Spec: v1alpha1.CheManagerSpec{
-				Host: "over.the.rainbow",
+				GatewayHost: "over.the.rainbow",
 			},
 		})
 
@@ -161,8 +165,8 @@ func TestDoesntCreateObjectsInMultiHost(t *testing.T) {
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: true,
 		},
 	})
 
@@ -226,8 +230,8 @@ func TestDeletesObjectsInMultiHost(t *testing.T) {
 				Finalizers: []string{FinalizerName},
 			},
 			Spec: v1alpha1.CheManagerSpec{
-				Host:    "over.the.rainbow",
-				Routing: v1alpha1.MultiHost,
+				GatewayHost:     "over.the.rainbow",
+				GatewayDisabled: true,
 			},
 		})
 
@@ -277,8 +281,8 @@ func TestNoManagerSharedWhenReconcilingNonExistent(t *testing.T) {
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: true,
 		},
 	})
 
@@ -309,8 +313,8 @@ func TestAddsManagerToSharedMapOnCreate(t *testing.T) {
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: true,
 		},
 	})
 
@@ -353,8 +357,8 @@ func TestUpdatesManagerInSharedMapOnUpdate(t *testing.T) {
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: true,
 		},
 	})
 
@@ -379,13 +383,13 @@ func TestUpdatesManagerInSharedMapOnUpdate(t *testing.T) {
 		t.Fatalf("Found a manager that we didn't reconcile. Curious (and buggy). We found %s but should have found %s", mgr.Name, managerName)
 	}
 
-	if mgr.Spec.Host != "over.the.rainbow" {
-		t.Fatalf("Unexpected host value: expected: over.the.rainbow, actual: %s", mgr.Spec.Host)
+	if mgr.Spec.GatewayHost != "over.the.rainbow" {
+		t.Fatalf("Unexpected host value: expected: over.the.rainbow, actual: %s", mgr.Spec.GatewayHost)
 	}
 
 	// now update the manager and reconcile again. See that the map contains the updated value
 	mgr = *mgr.DeepCopy()
-	mgr.Spec.Host = "over.the.shoulder"
+	mgr.Spec.GatewayHost = "over.the.shoulder"
 	err = cl.Update(context.TODO(), &mgr)
 	if err != nil {
 		t.Fatalf("Failed to update. Wat? %s", err)
@@ -402,8 +406,8 @@ func TestUpdatesManagerInSharedMapOnUpdate(t *testing.T) {
 		t.Fatalf("Found a manager that we didn't reconcile. Curious (and buggy). We found %s but should have found %s", mgr.Name, managerName)
 	}
 
-	if mgr.Spec.Host != "over.the.rainbow" {
-		t.Fatalf("Unexpected host value: expected: over.the.rainbow, actual: %s", mgr.Spec.Host)
+	if mgr.Spec.GatewayHost != "over.the.rainbow" {
+		t.Fatalf("Unexpected host value: expected: over.the.rainbow, actual: %s", mgr.Spec.GatewayHost)
 	}
 
 	// now reconcile and see that the value in the map is now updated
@@ -423,8 +427,8 @@ func TestUpdatesManagerInSharedMapOnUpdate(t *testing.T) {
 		t.Fatalf("Found a manager that we didn't reconcile. Curious (and buggy). We found %s but should have found %s", mgr.Name, managerName)
 	}
 
-	if mgr.Spec.Host != "over.the.shoulder" {
-		t.Fatalf("Unexpected host value: expected: over.the.shoulder, actual: %s", mgr.Spec.Host)
+	if mgr.Spec.GatewayHost != "over.the.shoulder" {
+		t.Fatalf("Unexpected host value: expected: over.the.shoulder, actual: %s", mgr.Spec.GatewayHost)
 	}
 }
 
@@ -445,8 +449,8 @@ func TestRemovesManagerFromSharedMapOnDelete(t *testing.T) {
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: true,
 		},
 	})
 
@@ -500,7 +504,7 @@ func TestManagerFinalization(t *testing.T) {
 				Finalizers: []string{FinalizerName},
 			},
 			Spec: v1alpha1.CheManagerSpec{
-				Host: "over.the.rainbow",
+				GatewayHost: "over.the.rainbow",
 			},
 		},
 		&corev1.ConfigMap{

@@ -3,6 +3,4 @@ apiVersion: che.eclipse.org/v1alpha1
 metadata:
   name: che
 spec:
-  host: che.${MINIKUBE_IP}.nip.io
-  routing: singlehost
-
+  gatewayHost: che.${MINIKUBE_IP}.nip.io

@@ -9,14 +9,17 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
 	dw "github.com/devfile/api/v2/pkg/apis/workspaces/v1alpha2"
+	"github.com/devfile/api/v2/pkg/attributes"
 	dwo "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
-	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting/solvers"
-	"github.com/devfile/devworkspace-operator/pkg/config"
+	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/solvers"
+	"github.com/devfile/devworkspace-operator/pkg/constants"
+	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +44,7 @@ func createTestScheme() *runtime.Scheme {
 	return scheme
 }
 
-func getSpecObjects(t *testing.T, routing *dwo.WorkspaceRouting) (client.Client, solvers.RoutingSolver, solvers.RoutingObjects) {
+func getSpecObjects(t *testing.T, routing *dwo.DevWorkspaceRouting) (client.Client, solvers.RoutingSolver, solvers.RoutingObjects) {
 	scheme := createTestScheme()
 	cheManager := &v1alpha1.CheManager{
 		ObjectMeta: metav1.ObjectMeta{
@@ -50,7 +53,7 @@ func getSpecObjects(t *testing.T, routing *dwo.WorkspaceRouting) (client.Client,
 			Finalizers: []string{manager.FinalizerName},
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host: "over.the.rainbow",
+			GatewayHost: "over.the.rainbow",
 		},
 	}
 
@@ -86,15 +89,16 @@ func getSpecObjects(t *testing.T, routing *dwo.WorkspaceRouting) (client.Client,
 	return cl, solver, objs
 }
 
-func simpleWorkspaceRouting() *dwo.WorkspaceRouting {
-	return &dwo.WorkspaceRouting{
+func subdomainDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
+	return &dwo.DevWorkspaceRouting{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "routing",
 			Namespace: "ws",
 		},
-		Spec: dwo.WorkspaceRoutingSpec{
-			WorkspaceId:  "wsid",
-			RoutingClass: "che",
+		Spec: dwo.DevWorkspaceRoutingSpec{
+			WorkspaceId:   "wsid",
+			RoutingClass:  "che",
+			RoutingSuffix: "over.the.rainbow",
 			Endpoints: map[string]dwo.EndpointList{
 				"m1": {
 					{
@@ -123,8 +127,56 @@ func simpleWorkspaceRouting() *dwo.WorkspaceRouting {
 	}
 }
 
-func TestCreateObjects(t *testing.T) {
-	cl, _, objs := getSpecObjects(t, simpleWorkspaceRouting())
+func relocatableDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
+	return &dwo.DevWorkspaceRouting{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "routing",
+			Namespace: "ws",
+		},
+		Spec: dwo.DevWorkspaceRoutingSpec{
+			WorkspaceId:   "wsid",
+			RoutingClass:  "che",
+			RoutingSuffix: "over.the.rainbow",
+			Endpoints: map[string]dwo.EndpointList{
+				"m1": {
+					{
+						Name:       "e1",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
+						Protocol:   "https",
+						Path:       "/1/",
+						Attributes: attributes.Attributes{
+							urlRewriteSupportedEndpointAttributeName: apiext.JSON{Raw: []byte("\"true\"")},
+						},
+					},
+					{
+						Name:       "e2",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
+						Protocol:   "http",
+						Path:       "/2.js",
+						Secure:     true,
+						Attributes: attributes.Attributes{
+							urlRewriteSupportedEndpointAttributeName: apiext.JSON{Raw: []byte("\"true\"")},
+						},
+					},
+					{
+						Name:       "e3",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
+						Attributes: attributes.Attributes{
+							urlRewriteSupportedEndpointAttributeName: apiext.JSON{Raw: []byte("\"true\"")},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestCreateRelocatedObjects(t *testing.T) {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	cl, _, objs := getSpecObjects(t, relocatableDevWorkspaceRouting())
 
 	t.Run("noIngresses", func(t *testing.T) {
 		if len(objs.Ingresses) != 0 {
@@ -155,7 +207,7 @@ func TestCreateObjects(t *testing.T) {
 				t.Errorf("The namespace of the associated che manager should have been recorded in the service annotation")
 			}
 
-			if svc.Labels[config.WorkspaceIDLabel] != "wsid" {
+			if svc.Labels[constants.WorkspaceIDLabel] != "wsid" {
 				t.Errorf("The workspace ID should be recorded in the service labels")
 			}
 		})
@@ -211,8 +263,70 @@ func TestCreateObjects(t *testing.T) {
 	})
 }
 
-func TestReportExposedEndpoints(t *testing.T) {
-	routing := simpleWorkspaceRouting()
+func TestCreateSubDomainObjects(t *testing.T) {
+	testCommon := func(infra infrastructure.Type) solvers.RoutingObjects {
+		infrastructure.InitializeForTesting(infra)
+
+		cl, _, objs := getSpecObjects(t, subdomainDevWorkspaceRouting())
+
+		t.Run("noPodAdditions", func(t *testing.T) {
+			if objs.PodAdditions != nil {
+				t.Error()
+			}
+		})
+
+		for i := range objs.Services {
+			t.Run(fmt.Sprintf("service-%d", i), func(t *testing.T) {
+				svc := &objs.Services[i]
+				if svc.Annotations[defaults.ConfigAnnotationCheManagerName] != "che" {
+					t.Errorf("The name of the associated che manager should have been recorded in the service annotation")
+				}
+
+				if svc.Annotations[defaults.ConfigAnnotationCheManagerNamespace] != "ns" {
+					t.Errorf("The namespace of the associated che manager should have been recorded in the service annotation")
+				}
+
+				if svc.Labels[constants.WorkspaceIDLabel] != "wsid" {
+					t.Errorf("The workspace ID should be recorded in the service labels")
+				}
+			})
+		}
+
+		t.Run("noWorkspaceTraefikConfig", func(t *testing.T) {
+			cms := &corev1.ConfigMapList{}
+			cl.List(context.TODO(), cms)
+
+			if len(cms.Items) != 1 {
+				t.Errorf("there should be 1 configmaps created for the gateway config of the workspace and che but there were: %d", len(cms.Items))
+			}
+
+			cm := cms.Items[0]
+			if _, ok := cm.Data["traefik.yml"]; !ok {
+				t.Errorf("There should be basic gateway configuration with a config file called `traefik.yml`, but none such found.")
+			}
+		})
+
+		return objs
+	}
+
+	t.Run("expectedIngresses", func(t *testing.T) {
+		objs := testCommon(infrastructure.Kubernetes)
+		if len(objs.Ingresses) != 1 {
+			t.Error()
+		}
+	})
+
+	t.Run("expectedRoutes", func(t *testing.T) {
+		objs := testCommon(infrastructure.OpenShiftv4)
+		if len(objs.Routes) != 1 {
+			t.Error()
+		}
+	})
+}
+
+func TestReportRelocatableExposedEndpoints(t *testing.T) {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	routing := relocatableDevWorkspaceRouting()
 	_, solver, objs := getSpecObjects(t, routing)
 
 	exposed, ready, err := solver.GetExposedEndpoints(routing.Spec.Endpoints, objs)
@@ -262,8 +376,61 @@ func TestReportExposedEndpoints(t *testing.T) {
 	}
 }
 
+func TestReportSubdomainExposedEndpoints(t *testing.T) {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	routing := subdomainDevWorkspaceRouting()
+	_, solver, objs := getSpecObjects(t, routing)
+
+	exposed, ready, err := solver.GetExposedEndpoints(routing.Spec.Endpoints, objs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !ready {
+		t.Errorf("The exposed endpoints should have been ready.")
+	}
+
+	if len(exposed) != 1 {
+		t.Errorf("There should have been 1 exposed endpoins but found %d", len(exposed))
+	}
+
+	m1, ok := exposed["m1"]
+	if !ok {
+		t.Errorf("The exposed endpoints should have been defined on the m1 machine.")
+	}
+
+	if len(m1) != 3 {
+		t.Fatalf("There should have been 3 endpoints for m1.")
+	}
+
+	e1 := m1[0]
+	if e1.Name != "e1" {
+		t.Errorf("The first endpoint should have been e1 but is %s", e1.Name)
+	}
+	if e1.Url != "https://wsid-1.over.the.rainbow/1/" {
+		t.Errorf("The e1 endpoint should have the following URL: '%s' but has '%s'.", "https://wsid-1.over.the.rainbow/1/", e1.Url)
+	}
+
+	e2 := m1[1]
+	if e2.Name != "e2" {
+		t.Errorf("The second endpoint should have been e2 but is %s", e1.Name)
+	}
+	if e2.Url != "https://wsid-1.over.the.rainbow/2.js" {
+		t.Errorf("The e2 endpoint should have the following URL: '%s' but has '%s'.", "https://wsid-1.over.the.rainbow/2.js", e2.Url)
+	}
+
+	e3 := m1[2]
+	if e3.Name != "e3" {
+		t.Errorf("The third endpoint should have been e3 but is %s", e1.Name)
+	}
+	if e3.Url != "http://wsid-1.over.the.rainbow/" {
+		t.Errorf("The e3 endpoint should have the following URL: '%s' but has '%s'.", "https://wsid-1.over.the.rainbow/", e3.Url)
+	}
+}
+
 func TestFinalize(t *testing.T) {
-	routing := simpleWorkspaceRouting()
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	routing := relocatableDevWorkspaceRouting()
 	cl, slv, _ := getSpecObjects(t, routing)
 
 	// the create test checks that during the above call, the solver created the 2 traefik configmaps

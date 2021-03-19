@@ -6,7 +6,6 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/api/extensions/v1beta1"
@@ -27,7 +26,7 @@ func (g *CheGateway) reconcileIngress(syncer sync.Syncer, ctx context.Context, m
 	var err error
 	var ingressHost string
 
-	if util.IsSingleHost(manager) {
+	if !manager.Spec.GatewayDisabled {
 		var inCluster runtime.Object
 		changed, inCluster, err = syncer.Sync(ctx, manager, ingress, ingressDiffOpts)
 		if err != nil {
@@ -58,7 +57,7 @@ func getIngressSpec(manager *v1alpha1.CheManager) *v1beta1.Ingress {
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
 				{
-					Host: manager.Spec.Host,
+					Host: manager.Spec.GatewayHost,
 					IngressRuleValue: v1beta1.IngressRuleValue{
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{

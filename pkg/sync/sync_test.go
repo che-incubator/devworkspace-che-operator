@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ var (
 )
 
 func init() {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
 	corev1.AddToScheme(scheme)
 }
 

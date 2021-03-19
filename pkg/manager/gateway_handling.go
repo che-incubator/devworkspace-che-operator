@@ -12,7 +12,25 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 )
 
-func (r *CheReconciler) singlehostFinalize(ctx context.Context, manager *v1alpha1.CheManager) error {
+// Reconciles the gateway - syncs it with the cluster if gateway is enabled in the manager, other deletes it.
+// Returns true if gateway deployment is changed, the host on which it is deployed (if so), and error (if any).
+func (r *CheReconciler) gatewayReconcile(ctx context.Context, manager *v1alpha1.CheManager) (bool, string, error) {
+	var changed bool
+	var err error
+	var host string
+
+	if manager.Spec.GatewayDisabled {
+		changed, host, err = true, "", r.gateway.Delete(ctx, manager)
+	} else {
+		changed, host, err = r.gateway.Sync(ctx, manager)
+	}
+
+	return changed, host, err
+}
+
+// Checks that there are no workspace configurations for the gateway (which would mean running workspaces).
+// If there are some, an error is returned.
+func (r *CheReconciler) gatewayConfigFinalize(ctx context.Context, manager *v1alpha1.CheManager) error {
 	// we need to stop the reconcile if there are workspaces handled by it.
 	// we detect that by the presence of the gateway configmaps in the namespace of the manager
 	list := corev1.ConfigMapList{}

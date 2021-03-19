@@ -1,0 +1,61 @@
+name: Release DevWorkspace Che Operator
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'release version in format vX.Y.Z'
+        required: true
+      dwoVersion:
+        description: 'DevWorkspace operator version in format vX.Y.Z'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.1
+        with:
+          fetch-depth: 0
+      - 
+        name: Login to quay.io
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+          registry: quay.io
+      - 
+        name: Set up Python 3.6
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+      - 
+        name: Setup yq
+        run: |
+          pip install yq
+      -
+        name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.13
+      -
+        name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      -
+        name: Go mod
+        run: go mod download
+      - 
+        name: Build image, generate deployments and push git tag
+        run: |
+          git config --global user.name "Mykhailo Kuznietsov"
+          git config --global user.email "mkuznets@redhat.com"
+
+          export GITHUB_TOKEN=${{ secrets.CHE_INCUBATOR_BOT_GITHUB_TOKEN }}
+          bash -x ./make-release.sh --version ${{ github.event.inputs.version}} --dwo-version ${{ github.event.inputs.dwoVersion}}

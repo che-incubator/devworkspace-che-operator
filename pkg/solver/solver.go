@@ -16,14 +16,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devfile/devworkspace-operator/pkg/constants"
+
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/util"
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	dwo "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
-	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting/solvers"
-	"github.com/devfile/devworkspace-operator/pkg/config"
+	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/solvers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,11 +62,11 @@ func Getter(scheme *runtime.Scheme) *CheRouterGetter {
 	}
 }
 
-func (g *CheRouterGetter) HasSolver(routingClass controllerv1alpha1.WorkspaceRoutingClass) bool {
+func (g *CheRouterGetter) HasSolver(routingClass controllerv1alpha1.DevWorkspaceRoutingClass) bool {
 	return isSupported(routingClass)
 }
 
-func (g *CheRouterGetter) GetSolver(client client.Client, routingClass controllerv1alpha1.WorkspaceRoutingClass) (solver solvers.RoutingSolver, err error) {
+func (g *CheRouterGetter) GetSolver(client client.Client, routingClass controllerv1alpha1.DevWorkspaceRoutingClass) (solver solvers.RoutingSolver, err error) {
 	if !isSupported(routingClass) {
 		return nil, solvers.RoutingNotSupported
 	}
@@ -98,7 +98,7 @@ func (g *CheRouterGetter) SetupControllerManager(mgr *builder.Builder) error {
 }
 
 func isGatewayWorkspaceConfig(obj metav1.Object) (bool, types.NamespacedName) {
-	workspaceID := obj.GetLabels()[config.WorkspaceIDLabel]
+	workspaceID := obj.GetLabels()[constants.WorkspaceIDLabel]
 	objectName := obj.GetName()
 
 	// bail out quickly if we're not dealing with a configmap with an expected name
@@ -106,8 +106,8 @@ func isGatewayWorkspaceConfig(obj metav1.Object) (bool, types.NamespacedName) {
 		return false, types.NamespacedName{}
 	}
 
-	routingName := obj.GetAnnotations()[defaults.ConfigAnnotationWorkspaceRoutingName]
-	routingNamespace := obj.GetAnnotations()[defaults.ConfigAnnotationWorkspaceRoutingNamespace]
+	routingName := obj.GetAnnotations()[defaults.ConfigAnnotationDevWorkspaceRoutingName]
+	routingNamespace := obj.GetAnnotations()[defaults.ConfigAnnotationDevWorkspaceRoutingNamespace]
 
 	// if there is no annotation for the routing, we're out of luck.. this should not happen though
 	if routingName == "" {
@@ -118,35 +118,27 @@ func isGatewayWorkspaceConfig(obj metav1.Object) (bool, types.NamespacedName) {
 	return true, types.NamespacedName{Name: routingName, Namespace: routingNamespace}
 }
 
-func (c *CheRoutingSolver) FinalizerRequired(routing *controllerv1alpha1.WorkspaceRouting) bool {
+func (c *CheRoutingSolver) FinalizerRequired(routing *controllerv1alpha1.DevWorkspaceRouting) bool {
 	return true
 }
 
-func (c *CheRoutingSolver) Finalize(routing *controllerv1alpha1.WorkspaceRouting) error {
+func (c *CheRoutingSolver) Finalize(routing *controllerv1alpha1.DevWorkspaceRouting) error {
 	cheManager, err := cheManagerOfRouting(routing)
 	if err != nil {
 		return err
 	}
 
-	if util.IsSingleHost(cheManager) {
-		return c.singlehostFinalize(cheManager, routing)
-	}
-
-	return c.multihostFinalize(cheManager, routing)
+	return c.cheRoutingFinalize(cheManager, routing)
 }
 
 // GetSpecObjects constructs cluster routing objects which should be applied on the cluster
-func (c *CheRoutingSolver) GetSpecObjects(routing *controllerv1alpha1.WorkspaceRouting, workspaceMeta solvers.WorkspaceMetadata) (solvers.RoutingObjects, error) {
+func (c *CheRoutingSolver) GetSpecObjects(routing *controllerv1alpha1.DevWorkspaceRouting, workspaceMeta solvers.WorkspaceMetadata) (solvers.RoutingObjects, error) {
 	cheManager, err := cheManagerOfRouting(routing)
 	if err != nil {
 		return solvers.RoutingObjects{}, err
 	}
 
-	if util.IsSingleHost(cheManager) {
-		return c.singlehostSpecObjects(cheManager, routing, workspaceMeta)
-	}
-
-	return c.multihostSpecObjects(cheManager, routing, workspaceMeta)
+	return c.cheSpecObjects(cheManager, routing, workspaceMeta)
 }
 
 // GetExposedEndpoints retreives the URL for each endpoint in a devfile spec from a set of RoutingObjects.
@@ -160,25 +152,21 @@ func (c *CheRoutingSolver) GetExposedEndpoints(endpoints map[string]controllerv1
 
 	managerName := routingObj.Services[0].Annotations[defaults.ConfigAnnotationCheManagerName]
 	managerNamespace := routingObj.Services[0].Annotations[defaults.ConfigAnnotationCheManagerNamespace]
-	workspaceID := routingObj.Services[0].Labels[config.WorkspaceIDLabel]
+	workspaceID := routingObj.Services[0].Labels[constants.WorkspaceIDLabel]
 
 	manager, err := findCheManager(client.ObjectKey{Name: managerName, Namespace: managerNamespace})
 	if err != nil {
 		return nil, false, err
 	}
 
-	if util.IsSingleHost(manager) {
-		return c.singlehostExposedEndpoints(manager, workspaceID, endpoints, routingObj)
-	}
-
-	return c.multihostExposedEndpoints(manager, workspaceID, endpoints, routingObj)
+	return c.cheExposedEndpoints(manager, workspaceID, endpoints, routingObj)
 }
 
-func isSupported(routingClass controllerv1alpha1.WorkspaceRoutingClass) bool {
+func isSupported(routingClass controllerv1alpha1.DevWorkspaceRoutingClass) bool {
 	return routingClass == "che"
 }
 
-func cheManagerOfRouting(routing *controllerv1alpha1.WorkspaceRouting) (*v1alpha1.CheManager, error) {
+func cheManagerOfRouting(routing *controllerv1alpha1.DevWorkspaceRouting) (*v1alpha1.CheManager, error) {
 	cheName := routing.Annotations[defaults.ConfigAnnotationCheManagerName]
 	cheNamespace := routing.Annotations[defaults.ConfigAnnotationCheManagerNamespace]
 

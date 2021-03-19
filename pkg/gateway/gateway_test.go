@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
+	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,8 @@ import (
 )
 
 func createTestScheme() *runtime.Scheme {
+	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+
 	scheme := runtime.NewScheme()
 
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
@@ -47,7 +50,7 @@ func TestCreate(t *testing.T) {
 			Namespace: ns,
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host: "over.the.rainbow",
+			GatewayHost: "over.the.rainbow",
 		},
 	})
 	if err != nil {
@@ -111,8 +114,8 @@ func TestDelete(t *testing.T) {
 			Namespace: ns,
 		},
 		Spec: v1alpha1.CheManagerSpec{
-			Host:    "over.the.rainbow",
-			Routing: v1alpha1.MultiHost,
+			GatewayHost:     "over.the.rainbow",
+			GatewayDisabled: false,
 		},
 	})
 	if err != nil {

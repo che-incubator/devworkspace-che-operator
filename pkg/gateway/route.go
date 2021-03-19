@@ -6,7 +6,6 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	routev1 "github.com/openshift/api/route/v1"
@@ -42,7 +41,7 @@ func (g *CheGateway) reconcileRoute(syncer sync.Syncer, ctx context.Context, mgr
 	var err error
 	var routeHost string
 
-	if !util.IsSingleHost(mgr) {
+	if mgr.Spec.GatewayDisabled {
 		changed, routeHost, err = true, "", syncer.Delete(ctx, route)
 	} else {
 		// The trouble with routes is that they don't support updating the host. Therefore they need to be
@@ -60,7 +59,7 @@ func (g *CheGateway) reconcileRoute(syncer sync.Syncer, ctx context.Context, mgr
 		// existing = explicit, now = generated -> re-create the route
 		// existing = explicit, now = explicit -> sync with host
 
-		expectGeneratedHost := mgr.Spec.Host == ""
+		expectGeneratedHost := mgr.Spec.GatewayHost == ""
 
 		key := client.ObjectKey{Name: route.Name, Namespace: route.Namespace}
 		existing := &routev1.Route{}
@@ -110,7 +109,7 @@ func getRouteSpec(manager *v1alpha1.CheManager) *routev1.Route {
 			Labels:    defaults.GetLabelsForComponent(manager, "external-access"),
 		},
 		Spec: routev1.RouteSpec{
-			Host: manager.Spec.Host,
+			Host: manager.Spec.GatewayHost,
 			To: routev1.RouteTargetReference{
 				Kind: "Service",
 				Name: GetGatewayServiceName(manager),
