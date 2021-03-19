@@ -52,8 +52,12 @@ compile: generate fmt vet
 
 ### prepare: Prepares the cluster for running the operator - deploys CRDs, rbac and the service account
 prepare: _mk_temp manifests
+# hiding the definition the variable in an eval makes it only defined in this target. Otherwise it would
+# be evaluated eagerly at the make start regardless of the target run, resulting in a temporary directory
+# being created needlessly.
 	$(eval PREPAPRE_OUTPUT_DIR := $(shell mktemp -p $(TEMP_DIR) -d))
 	OUTPUT_DIR=$(PREPAPRE_OUTPUT_DIR) DWCO_GENERATED_OVERLAY=support deploy/generate-deployment.sh --split-yaml
+# We want to tolerate if the namespace already exists, so || true to ensure the success exit code
 	$(K8S_CLI) create namespace $(DWCO_NAMESPACE) || true
 	$(K8S_CLI) apply -f $(PREPAPRE_OUTPUT_DIR)/$(PLATFORM)/combined.yaml
 	rm -Rf $(PREPAPRE_OUTPUT_DIR)
