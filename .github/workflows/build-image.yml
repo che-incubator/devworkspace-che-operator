@@ -22,6 +22,12 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v2
+    - name: Compose tags
+      id: tags
+      run: |
+        IMG=quay.io/che-incubator/devworkspace-che-operator
+        TAGS="${IMG}:ci,${IMG}:sha-${GITHUB_SHA::8}"
+        echo ::set-output name=tags::${TAGS}
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
     - name: Set up Docker Buildx
@@ -39,8 +45,7 @@ jobs:
         # go compiler segfaults on linux/s390x so leaving that out for now
         platforms: linux/amd64,linux/ppc64le
         push: true
-        tags: quay.io/che-incubator/devworkspace-che-operator:latest
-        tag_with_sha: true
+        tags: ${{ steps.tags.outputs.tags }}
     -
       name: Clear
       run: |
