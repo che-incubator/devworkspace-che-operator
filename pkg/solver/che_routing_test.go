@@ -65,11 +65,11 @@ func getSpecObjects(t *testing.T, routing *dwo.DevWorkspaceRouting) (client.Clie
 		t.Fatal(err)
 	}
 
-	meta := solvers.WorkspaceMetadata{
-		WorkspaceId:   routing.Spec.WorkspaceId,
-		Namespace:     routing.GetNamespace(),
-		PodSelector:   routing.Spec.PodSelector,
-		RoutingSuffix: routing.Spec.RoutingSuffix,
+	meta := solvers.DevWorkspaceMetadata{
+		DevWorkspaceId: routing.Spec.DevWorkspaceId,
+		Namespace:      routing.GetNamespace(),
+		PodSelector:    routing.Spec.PodSelector,
+		RoutingSuffix:  routing.Spec.RoutingSuffix,
 	}
 
 	// we need to do 1 round of che manager reconciliation so that the solver gets initialized
@@ -97,9 +97,9 @@ func subdomainDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
 			Namespace: "ws",
 		},
 		Spec: dwo.DevWorkspaceRoutingSpec{
-			WorkspaceId:   "wsid",
-			RoutingClass:  "che",
-			RoutingSuffix: "over.the.rainbow",
+			DevWorkspaceId: "wsid",
+			RoutingClass:   "che",
+			RoutingSuffix:  "over.the.rainbow",
 			Endpoints: map[string]dwo.EndpointList{
 				"m1": {
 					{
@@ -135,9 +135,9 @@ func relocatableDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
 			Namespace: "ws",
 		},
 		Spec: dwo.DevWorkspaceRoutingSpec{
-			WorkspaceId:   "wsid",
-			RoutingClass:  "che",
-			RoutingSuffix: "over.the.rainbow",
+			DevWorkspaceId: "wsid",
+			RoutingClass:   "che",
+			RoutingSuffix:  "over.the.rainbow",
 			Endpoints: map[string]dwo.EndpointList{
 				"m1": {
 					{
@@ -208,7 +208,7 @@ func TestCreateRelocatedObjects(t *testing.T) {
 				t.Errorf("The namespace of the associated che manager should have been recorded in the service annotation")
 			}
 
-			if svc.Labels[constants.WorkspaceIDLabel] != "wsid" {
+			if svc.Labels[constants.DevWorkspaceIDLabel] != "wsid" {
 				t.Errorf("The workspace ID should be recorded in the service labels")
 			}
 		})
@@ -287,7 +287,7 @@ func TestCreateSubDomainObjects(t *testing.T) {
 					t.Errorf("The namespace of the associated che manager should have been recorded in the service annotation")
 				}
 
-				if svc.Labels[constants.WorkspaceIDLabel] != "wsid" {
+				if svc.Labels[constants.DevWorkspaceIDLabel] != "wsid" {
 					t.Errorf("The workspace ID should be recorded in the service labels")
 				}
 			})
@@ -435,7 +435,7 @@ func TestFinalize(t *testing.T) {
 	cl, slv, _ := getSpecObjects(t, routing)
 
 	// the create test checks that during the above call, the solver created the 2 traefik configmaps
-	// (1 for the main config and the second for the workspace)
+	// (1 for the main config and the second for the devworkspace)
 
 	// now, let the solver finalize the routing
 	if err := slv.Finalize(routing); err != nil {

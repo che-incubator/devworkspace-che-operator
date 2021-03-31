@@ -28,7 +28,7 @@ func getRouteForService(order int, machineName string, endpointName string, port
 			Name:      getEndpointExposingObjectName(machineName, workspaceID, port, endpointName),
 			Namespace: service.Namespace,
 			Labels: map[string]string{
-				constants.WorkspaceIDLabel: workspaceID,
+				constants.DevWorkspaceIDLabel: workspaceID,
 			},
 			Annotations:     routeAnnotations(machineName, endpointName),
 			OwnerReferences: service.OwnerReferences,
@@ -64,7 +64,7 @@ func getIngressForService(order int, machineName string, endpointName string, po
 			Name:      getEndpointExposingObjectName(machineName, workspaceID, port, endpointName),
 			Namespace: service.Namespace,
 			Labels: map[string]string{
-				constants.WorkspaceIDLabel: workspaceID,
+				constants.DevWorkspaceIDLabel: workspaceID,
 			},
 			Annotations:     nginxIngressAnnotations(machineName, endpointName),
 			OwnerReferences: service.OwnerReferences,

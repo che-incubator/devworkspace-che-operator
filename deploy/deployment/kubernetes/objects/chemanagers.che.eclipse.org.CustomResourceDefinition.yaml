@@ -47,20 +47,20 @@ spec:
               type: string
             gatewayDisabled:
               description: "GatewayDisabled enables or disables routing of the url
-                rewrite supporting workspace endpoints through a common gateway (the
-                hostname of which is defined by the GatewayHost). \n Default value
-                is \"false\" meaning that the gateway is enabled. \n If set to false
-                (i.e. the gateway is enabled), endpoints marked using the \"urlRewriteSupported\"
-                attribute are exposed on unique subpaths of the GatewayHost, while
-                the rest of the workspace endpoints are exposed on subdomains of the
-                RoutingSuffix specified by the DevWorkspaceRouting of the workspace.
-                \n If set to true (i.e. the gateway is disabled), all endpoints are
-                deployed on subdomains of the RoutingSuffix."
+                rewrite supporting devworkspace endpoints through a common gateway
+                (the hostname of which is defined by the GatewayHost). \n Default
+                value is \"false\" meaning that the gateway is enabled. \n If set
+                to false (i.e. the gateway is enabled), endpoints marked using the
+                \"urlRewriteSupported\" attribute are exposed on unique subpaths of
+                the GatewayHost, while the rest of the devworkspace endpoints are
+                exposed on subdomains of the RoutingSuffix specified by the DevWorkspaceRouting
+                of the devworkspace. \n If set to true (i.e. the gateway is disabled),
+                all endpoints are deployed on subdomains of the RoutingSuffix."
               type: boolean
             gatewayHost:
-              description: "GatewayHost is the full host name used to expose workspace
+              description: "GatewayHost is the full host name used to expose devworkspace
                 endpoints that support url rewriting reverse proxy. See the GatewayDisabled
-                attribute for a more detailed description of where and how are workspace
+                attribute for a more detailed description of where and how are devworkspace
                 endpoints exposed in various configurations. \n This attribute is
                 mandatory on Kubernetes, optional on OpenShift."
               type: string

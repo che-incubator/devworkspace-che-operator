@@ -58,7 +58,7 @@ type portMappingValue struct {
 	order          int
 }
 
-func (c *CheRoutingSolver) cheSpecObjects(cheManager *dwoche.CheManager, routing *dwo.DevWorkspaceRouting, workspaceMeta solvers.WorkspaceMetadata) (solvers.RoutingObjects, error) {
+func (c *CheRoutingSolver) cheSpecObjects(cheManager *dwoche.CheManager, routing *dwo.DevWorkspaceRouting, workspaceMeta solvers.DevWorkspaceMetadata) (solvers.RoutingObjects, error) {
 	objs := solvers.RoutingObjects{}
 
 	objs.Services = solvers.GetDiscoverableServicesForEndpoints(routing.Spec.Endpoints, workspaceMeta)
@@ -102,7 +102,7 @@ func (c *CheRoutingSolver) cheSpecObjects(cheManager *dwoche.CheManager, routing
 	}
 
 	// k, now we have to create our own objects for configuring the gateway
-	configMaps, err := c.getGatewayConfigsAndFillRoutingObjects(cheManager, workspaceMeta.WorkspaceId, routing, &objs)
+	configMaps, err := c.getGatewayConfigsAndFillRoutingObjects(cheManager, workspaceMeta.DevWorkspaceId, routing, &objs)
 	if err != nil {
 		return solvers.RoutingObjects{}, err
 	}
@@ -210,12 +210,12 @@ func isSecureScheme(scheme string) bool {
 }
 
 func (c *CheRoutingSolver) getGatewayConfigsAndFillRoutingObjects(cheManager *dwoche.CheManager, workspaceID string, routing *dwo.DevWorkspaceRouting, objs *solvers.RoutingObjects) ([]corev1.ConfigMap, error) {
-	restrictedAnno, setRestrictedAnno := routing.Annotations[constants.WorkspaceRestrictedAccessAnnotation]
+	restrictedAnno, setRestrictedAnno := routing.Annotations[constants.DevWorkspaceRestrictedAccessAnnotation]
 
 	labels := defaults.GetLabelsForComponent(cheManager, "gateway-config")
-	labels[constants.WorkspaceIDLabel] = workspaceID
+	labels[constants.DevWorkspaceIDLabel] = workspaceID
 	if setRestrictedAnno {
-		labels[constants.WorkspaceRestrictedAccessAnnotation] = restrictedAnno
+		labels[constants.DevWorkspaceRestrictedAccessAnnotation] = restrictedAnno
 	}
 
 	configMap := corev1.ConfigMap{
@@ -429,7 +429,7 @@ func findRouteForEndpoint(machineName string, endpoint dw.Endpoint, objs *solver
 func (c *CheRoutingSolver) cheRoutingFinalize(cheManager *dwoche.CheManager, routing *dwo.DevWorkspaceRouting) error {
 	configs := &corev1.ConfigMapList{}
 
-	selector, err := labels.Parse(fmt.Sprintf("%s=%s", constants.WorkspaceIDLabel, routing.Spec.WorkspaceId))
+	selector, err := labels.Parse(fmt.Sprintf("%s=%s", constants.DevWorkspaceIDLabel, routing.Spec.DevWorkspaceId))
 	if err != nil {
 		return err
 	}
