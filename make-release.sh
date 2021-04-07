@@ -111,7 +111,7 @@ set -e
 # change VERSION file
 echo "${VERSION}" > VERSION
 
-export IMG="quay.io/che-incubator/devworkspace-che-operator:${VERSION}"
+export DWCO_IMG="quay.io/che-incubator/devworkspace-che-operator:${VERSION}"
 
 sed -i "s/github.com\/devfile\/devworkspace-operator.*/github.com\/devfile\/devworkspace-operator ${DWO_VERSION}/" go.mod
 go mod download
