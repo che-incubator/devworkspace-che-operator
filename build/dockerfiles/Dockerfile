@@ -1,6 +1,13 @@
-# NOTE: using registry.access.redhat.com/rhel8/go-toolset does not work (user is requested to use registry.redhat.io)
-# NOTE: using registry.redhat.io/rhel8/go-toolset requires login, which complicates automation
-# NOTE: since updateBaseImages.sh does not support other registries than RHCC, update to RHEL8
+# Copyright (c) 2021 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
+#
 # https://access.redhat.com/containers/?tab=tags#/registry.access.redhat.com/devtools/go-toolset-rhel7
 FROM registry.access.redhat.com/devtools/go-toolset-rhel7:1.13.4-18  as builder
 ENV PATH=/opt/rh/go-toolset-1.13/root/usr/bin:${PATH} \
@@ -13,14 +20,15 @@ COPY go.mod go.mod
 COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+# NOTE: downstream this needs to be a vendor folder
+RUN go mod tidy; go mod vendor
 
 # Copy the go source
 COPY . .
 
 # Build
 RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH="amd64"; elif [[ ${ARCH} == "aarch64" ]]; then export ARCH="arm64"; fi && \
-    GOOS=linux GOARCH=${ARCH} CGO_ENABLED=0 GO111MODULE=on go build \
+  CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} GO111MODULE=on go build -mod=vendor -x \
   -a -o _output/bin/devworkspace-che-operator \
   -gcflags all=-trimpath=/ \
   -asmflags all=-trimpath=/ \
@@ -28,7 +36,7 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 
 
 # https://access.redhat.com/containers/?tab=tags#/registry.access.redhat.com/ubi8-minimal
-FROM registry.access.redhat.com/ubi8-minimal:8.3-230
+FROM registry.access.redhat.com/ubi8-minimal:8.3-298
 COPY --from=builder /workspace/_output/bin/devworkspace-che-operator /usr/local/bin/devworkspace-che-operator
 
 ENV USER_UID=1001 \
@@ -41,3 +49,5 @@ USER ${USER_UID}
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
 CMD /usr/local/bin/devworkspace-che-operator
+
+# append Brew metadata here
