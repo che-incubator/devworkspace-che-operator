@@ -63,7 +63,6 @@ func getSpecObjectsForManager(t *testing.T, mgr *v1alpha1.CheManager, routing *d
 		DevWorkspaceId: routing.Spec.DevWorkspaceId,
 		Namespace:      routing.GetNamespace(),
 		PodSelector:    routing.Spec.PodSelector,
-		RoutingSuffix:  routing.Spec.RoutingSuffix,
 	}
 
 	// we need to do 1 round of che manager reconciliation so that the solver gets initialized
@@ -106,7 +105,6 @@ func subdomainDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
 		Spec: dwo.DevWorkspaceRoutingSpec{
 			DevWorkspaceId: "wsid",
 			RoutingClass:   "che",
-			RoutingSuffix:  "over.the.rainbow",
 			Endpoints: map[string]dwo.EndpointList{
 				"m1": {
 					{
@@ -144,7 +142,6 @@ func relocatableDevWorkspaceRouting() *dwo.DevWorkspaceRouting {
 		Spec: dwo.DevWorkspaceRoutingSpec{
 			DevWorkspaceId: "wsid",
 			RoutingClass:   "che",
-			RoutingSuffix:  "over.the.rainbow",
 			Endpoints: map[string]dwo.EndpointList{
 				"m1": {
 					{
@@ -322,11 +319,17 @@ func TestCreateSubDomainObjects(t *testing.T) {
 		if len(objs.Ingresses) != 1 {
 			t.Error()
 		}
+		if objs.Ingresses[0].Spec.Rules[0].Host != "wsid-1.over.the.rainbow" {
+			t.Error()
+		}
 	})
 
 	t.Run("expectedRoutes", func(t *testing.T) {
 		objs := testCommon(infrastructure.OpenShiftv4)
 		if len(objs.Routes) != 1 {
+			t.Error()
+		}
+		if objs.Routes[0].Spec.Host != "wsid-1.over.the.rainbow" {
 			t.Error()
 		}
 	})
@@ -565,7 +568,7 @@ func TestUsesCustomCertificateForWorkspaceEndpointIngresses(t *testing.T) {
 		t.Fatalf("Unexpected number of host records on the TLS spec: %d", len(ingress.Spec.TLS[0].Hosts))
 	}
 
-	if ingress.Spec.TLS[0].Hosts[0] != "wsid-1.over.the.rainbow" {
+	if ingress.Spec.TLS[0].Hosts[0] != "wsid-1.beyond.comprehension" {
 		t.Errorf("Unexpected host name of the TLS spec: %s", ingress.Spec.TLS[0].Hosts[0])
 	}
 }
