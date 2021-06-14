@@ -186,9 +186,11 @@ func (r *CheClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	var changed bool
 	var host string
 
-	if changed, host, err = r.gatewayReconcile(ctx, current); err != nil {
-		return ctrl.Result{}, err
-	}
+	// By commenting this out, we are no longer in charge of the gateway, leaving the responsibility for
+	// managing it on the che-operator.
+	// if changed, host, err = r.gatewayReconcile(ctx, current); err != nil {
+	// 	return ctrl.Result{}, err
+	// }
 
 	workspaceBaseDomain := current.Spec.WorkspaceDomainEndpoints.BaseDomain
 
