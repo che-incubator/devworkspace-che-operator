@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/devfile/api/v2 v2.0.0-20210427194344-cd9c30e6aa05
 	github.com/devfile/devworkspace-operator v0.2.1-0.20210518134212-698baff5f249
-	github.com/eclipse-che/che-operator v0.0.0-00010101000000-000000000000
+	github.com/eclipse-che/che-operator v0.0.0-20210714094822-9bb621bf88a6
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-logr/zapr v0.2.0 // indirect
 	github.com/google/go-cmp v0.5.0
@@ -58,5 +58,3 @@ replace (
 )
 
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
-
-replace github.com/eclipse-che/che-operator => github.com/metlos/che-operator v0.0.0-20210607155040-562e95e39ad2
